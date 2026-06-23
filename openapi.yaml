@@ -1,0 +1,542 @@
+openapi: 3.1.0
+
+info:
+  title: Snake Arena API
+  version: 1.0.0
+  description: |
+    Backend contract inferred from the frontend service interface in `frontend/src/services`.
+
+    Authentication is cookie-based. Endpoints marked with the `sessionCookie`
+    security requirement require an authenticated user session.
+
+    The frontend expects both request/response APIs and live subscription-style
+    updates for active games, watched games, and leaderboard changes. Those
+    subscriptions are modeled as Server-Sent Events (SSE).
+
+servers:
+  - url: http://localhost:8000
+
+tags:
+  - name: Auth
+  - name: Games
+  - name: Leaderboard
+
+paths:
+  /auth/session:
+    get:
+      tags: [Auth]
+      operationId: getSession
+      summary: Get the current authenticated user
+      description: Returns the signed-in user or `null` when no session exists.
+      responses:
+        '200':
+          description: Current session state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      operationId: signup
+      summary: Create an account and sign in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthCredentials'
+      responses:
+        '201':
+          description: Account created and session established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthCredentials'
+      responses:
+        '200':
+          description: Session established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Sign out
+      security:
+        - sessionCookie: []
+      responses:
+        '204':
+          description: Session cleared
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /games:
+    post:
+      tags: [Games]
+      operationId: startGame
+      summary: Start a new game
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartGameRequest'
+      responses:
+        '201':
+          description: Game started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartGameResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /games/active:
+    get:
+      tags: [Games]
+      operationId: listActiveGames
+      summary: List currently active games
+      responses:
+        '200':
+          description: Active games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActiveGame'
+
+  /games/active/events:
+    get:
+      tags: [Games]
+      operationId: streamActiveGames
+      summary: Stream active game list updates
+      description: |
+        SSE endpoint used to implement `onActiveGamesChange`.
+        Each `data:` payload is a JSON array of `ActiveGame` objects.
+      responses:
+        '200':
+          description: Active game update stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                update:
+                  value: |
+                    event: active-games
+                    data: [{"id":"g_123","username":"alice","mode":"walls","score":4,"startedAt":1710000000000}]
+
+  /games/{gameId}:
+    get:
+      tags: [Games]
+      operationId: getGameState
+      summary: Get the current state of a live game
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '200':
+          description: Current game state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameState'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Game has already ended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /games/{gameId}/state:
+    put:
+      tags: [Games]
+      operationId: pushGameState
+      summary: Push the latest in-progress game state
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGameStateRequest'
+      responses:
+        '204':
+          description: State accepted
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /games/{gameId}/complete:
+    post:
+      tags: [Games]
+      operationId: endGame
+      summary: Finish a game and record its final score
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteGameRequest'
+      responses:
+        '204':
+          description: Game ended and leaderboard updated
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /games/{gameId}/events:
+    get:
+      tags: [Games]
+      operationId: watchGame
+      summary: Stream a live game's state updates
+      description: |
+        SSE endpoint used to implement `watchGame`.
+        `state` events carry a JSON `GameState` payload. When a game ends, the
+        backend emits an `ended` event and closes the stream.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '200':
+          description: Game state update stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                state:
+                  value: |
+                    event: state
+                    data: {"width":20,"height":20,"mode":"walls","snake":[{"x":10,"y":10}],"dir":"right","pendingDir":"right","food":{"x":12,"y":10},"score":0,"alive":true,"tick":0}
+
+                    event: ended
+                    data: null
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /leaderboard:
+    get:
+      tags: [Leaderboard]
+      operationId: getLeaderboard
+      summary: Get leaderboard entries for a mode
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Mode'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: Leaderboard entries sorted by descending score
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+  /leaderboard/events:
+    get:
+      tags: [Leaderboard]
+      operationId: streamLeaderboard
+      summary: Stream leaderboard updates for a mode
+      description: |
+        SSE endpoint used to implement `onLeaderboardChange`.
+        Each `data:` payload is a JSON array of `LeaderboardEntry` objects.
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Mode'
+      responses:
+        '200':
+          description: Leaderboard update stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                update:
+                  value: |
+                    event: leaderboard
+                    data: [{"username":"alice","score":24,"mode":"walls","at":1710000000000}]
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session cookie established by the login or signup endpoint.
+
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+      required:
+        - id
+        - username
+
+    SessionResponse:
+      type: object
+      properties:
+        user:
+          anyOf:
+            - $ref: '#/components/schemas/User'
+            - type: 'null'
+      required:
+        - user
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - user
+
+    AuthCredentials:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+      required:
+        - username
+        - password
+
+    Mode:
+      type: string
+      enum:
+        - walls
+        - wrap
+
+    Direction:
+      type: string
+      enum:
+        - up
+        - down
+        - left
+        - right
+
+    Cell:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+      required:
+        - x
+        - y
+
+    GameState:
+      type: object
+      properties:
+        width:
+          type: integer
+        height:
+          type: integer
+        mode:
+          $ref: '#/components/schemas/Mode'
+        snake:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cell'
+        dir:
+          $ref: '#/components/schemas/Direction'
+        pendingDir:
+          $ref: '#/components/schemas/Direction'
+        food:
+          $ref: '#/components/schemas/Cell'
+        score:
+          type: integer
+        alive:
+          type: boolean
+        tick:
+          type: integer
+      required:
+        - width
+        - height
+        - mode
+        - snake
+        - dir
+        - pendingDir
+        - food
+        - score
+        - alive
+        - tick
+
+    ActiveGame:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        mode:
+          $ref: '#/components/schemas/Mode'
+        score:
+          type: integer
+        startedAt:
+          type: integer
+      required:
+        - id
+        - username
+        - mode
+        - score
+        - startedAt
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        username:
+          type: string
+        score:
+          type: integer
+        mode:
+          $ref: '#/components/schemas/Mode'
+        at:
+          type: integer
+      required:
+        - username
+        - score
+        - mode
+        - at
+
+    StartGameRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/Mode'
+      required:
+        - mode
+
+    StartGameResponse:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+
+    UpdateGameStateRequest:
+      type: object
+      properties:
+        state:
+          $ref: '#/components/schemas/GameState'
+      required:
+        - state
+
+    CompleteGameRequest:
+      type: object
+      properties:
+        finalState:
+          $ref: '#/components/schemas/GameState'
+      required:
+        - finalState
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
