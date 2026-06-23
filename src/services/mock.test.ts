@@ -1,15 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { MockGameService } from "./mock";
 import { createGame, step } from "@/game/snake";
 
 function freshService() {
   localStorage.clear();
-  return new MockGameService();
+  return new MockGameService({ bots: false });
 }
 
 describe("MockGameService", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     localStorage.clear();
   });
 
