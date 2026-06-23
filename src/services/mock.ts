@@ -31,7 +31,7 @@ interface DB {
   sessionUserId: string | null;
 }
 
-function loadDB(): DB {
+function loadDB(seed = true): DB {
   if (typeof localStorage === "undefined") {
     return { users: [], leaderboard: [], sessionUserId: null };
   }
@@ -39,11 +39,10 @@ function loadDB(): DB {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as DB;
   } catch {}
-  // seed
+  const empty: DB = { users: [], leaderboard: [], sessionUserId: null };
+  if (!seed) return empty;
   const seeded: DB = {
-    users: [
-      { id: "u_seed1", username: "guest", password: "guest" },
-    ],
+    users: [{ id: "u_seed1", username: "guest", password: "guest" }],
     leaderboard: [
       { username: "alice", score: 24, mode: "walls", at: Date.now() - 86400000 },
       { username: "bob", score: 18, mode: "walls", at: Date.now() - 3600000 },
