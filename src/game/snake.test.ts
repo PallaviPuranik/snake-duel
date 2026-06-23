@@ -37,26 +37,23 @@ describe("snake", () => {
   });
 
   it("dies from self-collision", () => {
-    // build a snake that will collide with itself
+    // U-shaped snake; head (5,5) moves right into body cell (6,5).
+    // Note: the tail gets popped, so (6,5) must NOT be the last cell.
     let g = createGame("wrap", 10, 10);
     g = {
       ...g,
       snake: [
-        { x: 5, y: 5 },
-        { x: 4, y: 5 },
-        { x: 4, y: 6 },
+        { x: 5, y: 5 }, // head
         { x: 5, y: 6 },
         { x: 6, y: 6 },
-        { x: 6, y: 5 },
+        { x: 6, y: 5 }, // body cell directly to the right of the head
+        { x: 7, y: 5 },
+        { x: 7, y: 6 }, // tail (gets popped)
       ],
-      dir: "up",
-      pendingDir: "up",
+      dir: "right",
+      pendingDir: "right",
       food: { x: 0, y: 0 },
     };
-    // moving up from (5,5)... that's free. let me make it move down into body
-    g = setDir({ ...g, dir: "right", pendingDir: "right" }, "right");
-    // simpler: head (5,5) moving right hits (6,5) which is body
-    g = { ...g, dir: "right", pendingDir: "right" };
     g = step(g);
     expect(g.alive).toBe(false);
   });
