@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ..auth import get_current_token, get_optional_user, get_store
 from ..models import AuthCredentials, AuthResponse, SessionResponse, User
-from ..store import InMemoryStore
+from ..store_base import Store
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -16,7 +16,7 @@ def get_session(user: User | None = Depends(get_optional_user)) -> SessionRespon
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup(
     credentials: AuthCredentials,
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> AuthResponse:
     try:
         user = store.create_user(credentials.username, credentials.password)
@@ -30,7 +30,7 @@ def signup(
 @router.post("/login", response_model=AuthResponse)
 def login(
     credentials: AuthCredentials,
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> AuthResponse:
     user = store.authenticate(credentials.username, credentials.password)
     if user is None:
@@ -43,7 +43,7 @@ def login(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
     token: str = Depends(get_current_token),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> Response:
     store.revoke_token(token)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

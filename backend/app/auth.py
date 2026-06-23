@@ -12,9 +12,10 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .models import User
+from .store_base import Store
 
 if TYPE_CHECKING:
-    from .store import InMemoryStore
+    from .store_base import Store
 
 
 PASSWORD_HASH_PREFIX = "scrypt"
@@ -59,7 +60,7 @@ def new_token_record(user_id: str) -> TokenRecord:
     return TokenRecord(user_id=user_id, expires_at=int(time.time()) + TOKEN_TTL_SECONDS)
 
 
-def get_store(request: Request) -> InMemoryStore:
+def get_store(request: Request) -> Store:
     return request.app.state.store
 
 
@@ -73,7 +74,7 @@ def get_bearer_token(
 
 def get_optional_user(
     token: str | None = Depends(get_bearer_token),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> User | None:
     if token is None:
         return None
@@ -93,7 +94,7 @@ def get_current_user(
 
 def get_current_token(
     token: str | None = Depends(get_bearer_token),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> str:
     if token is None or store.user_from_token(token) is None:
         raise HTTPException(

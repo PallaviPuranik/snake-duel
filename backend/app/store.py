@@ -1,38 +1,21 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
 from time import time
 from uuid import uuid4
 
 from .auth import TokenRecord, hash_password, new_access_token, new_token_record, verify_password
 from .models import ActiveGame, Cell, GameState, LeaderboardEntry, Mode, User
-
-
-@dataclass(slots=True)
-class StoredUser:
-    id: str
-    username: str
-    password_hash: str
-
-
-@dataclass(slots=True)
-class LiveGame:
-    id: str
-    user_id: str
-    username: str
-    mode: Mode
-    state: GameState
-    started_at: int
+from .store_base import LiveGameRecord, StoredUserRecord
 
 
 class InMemoryStore:
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._users: dict[str, StoredUser] = {}
+        self._users: dict[str, StoredUserRecord] = {}
         self._tokens: dict[str, TokenRecord] = {}
         self._leaderboard: list[LeaderboardEntry] = []
-        self._live_games: dict[str, LiveGame] = {}
+        self._live_games: dict[str, LiveGameRecord] = {}
         self._ended_game_ids: set[str] = set()
         self._active_version = 0
         self._leaderboard_versions: dict[Mode, int] = {"walls": 0, "wrap": 0}
@@ -88,8 +71,12 @@ class InMemoryStore:
         self._game_versions["g_seed_walls"] = 1
         self._game_versions["g_seed_wrap"] = 1
 
-    def _seed_user(self, username: str, password: str) -> StoredUser:
-        user = StoredUser(id=f"u_{uuid4().hex[:8]}", username=username, password_hash=hash_password(password))
+    def _seed_user(self, username: str, password: str) -> StoredUserRecord:
+        user = StoredUserRecord(
+            id=f"u_{uuid4().hex[:8]}",
+            username=username,
+            password_hash=hash_password(password),
+        )
         self._users[user.id] = user
         return user
 
@@ -97,12 +84,12 @@ class InMemoryStore:
         self,
         *,
         game_id: str,
-        user: StoredUser,
+        user: StoredUserRecord,
         mode: Mode,
         started_at: int,
         state: GameState,
     ) -> None:
-        self._live_games[game_id] = LiveGame(
+        self._live_games[game_id] = LiveGameRecord(
             id=game_id,
             user_id=user.id,
             username=user.username,
@@ -111,10 +98,10 @@ class InMemoryStore:
             started_at=started_at,
         )
 
-    def public_user(self, stored_user: StoredUser) -> User:
+    def public_user(self, stored_user: StoredUserRecord) -> User:
         return User(id=stored_user.id, username=stored_user.username)
 
-    def find_user_by_username(self, username: str) -> StoredUser | None:
+    def find_user_by_username(self, username: str) -> StoredUserRecord | None:
         normalized = username.strip().lower()
         for user in self._users.values():
             if user.username.lower() == normalized:
@@ -128,7 +115,7 @@ class InMemoryStore:
         with self._lock:
             if self.find_user_by_username(normalized) is not None:
                 raise ValueError("Username already taken")
-            stored_user = StoredUser(
+            stored_user = StoredUserRecord(
                 id=f"u_{uuid4().hex[:8]}",
                 username=normalized,
                 password_hash=hash_password(password),
@@ -169,7 +156,7 @@ class InMemoryStore:
     def create_game(self, user: User, mode: Mode) -> str:
         game_id = f"g_{uuid4().hex[:8]}"
         with self._lock:
-            self._live_games[game_id] = LiveGame(
+            self._live_games[game_id] = LiveGameRecord(
                 id=game_id,
                 user_id=user.id,
                 username=user.username,

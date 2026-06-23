@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -134,6 +136,38 @@ class SnakeArenaAPITests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"], "Game not found")
+
+    def test_serves_built_frontend_index_with_spa_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            frontend_dir = Path(temp_dir)
+            (frontend_dir / "assets").mkdir()
+            (frontend_dir / "index.html").write_text("<html><body>snake frontend</body></html>", encoding="utf-8")
+            (frontend_dir / "assets" / "app.js").write_text("console.log('snake');", encoding="utf-8")
+
+            client = TestClient(create_app(frontend_dist_dir=frontend_dir))
+
+            root_response = client.get("/")
+            asset_response = client.get("/assets/app.js")
+            fallback_response = client.get("/play")
+
+            self.assertEqual(root_response.status_code, 200)
+            self.assertIn("snake frontend", root_response.text)
+            self.assertEqual(asset_response.status_code, 200)
+            self.assertIn("console.log('snake');", asset_response.text)
+            self.assertEqual(fallback_response.status_code, 200)
+            self.assertIn("snake frontend", fallback_response.text)
+
+    def test_frontend_fallback_does_not_shadow_api_404s(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            frontend_dir = Path(temp_dir)
+            (frontend_dir / "index.html").write_text("<html><body>snake frontend</body></html>", encoding="utf-8")
+
+            client = TestClient(create_app(frontend_dist_dir=frontend_dir))
+
+            response = client.get("/auth/unknown")
+
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.json()["error"], "Not found")
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from ..models import (
     UpdateGameStateRequest,
     User,
 )
-from ..store import InMemoryStore
+from ..store_base import Store
 
 
 router = APIRouter(tags=["Games"])
@@ -34,20 +34,20 @@ def sse_event(event: str, data: Any) -> bytes:
 def start_game(
     request: StartGameRequest,
     user: User = Depends(get_current_user),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> StartGameResponse:
     return StartGameResponse(id=store.create_game(user, request.mode))
 
 
 @router.get("/games/active", response_model=list[ActiveGame])
-def list_active_games(store: InMemoryStore = Depends(get_store)) -> list[ActiveGame]:
+def list_active_games(store: Store = Depends(get_store)) -> list[ActiveGame]:
     return store.list_active_games()
 
 
 @router.get("/games/active/events")
 async def stream_active_games(
     request: Request,
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> StreamingResponse:
     async def event_stream():
         last_version = -1
@@ -66,7 +66,7 @@ async def stream_active_games(
 @router.get("/games/{game_id}", response_model=GameState)
 def get_game_state(
     game_id: str,
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> GameState:
     state = store.get_game_state(game_id)
     if state is not None:
@@ -81,7 +81,7 @@ def push_game_state(
     game_id: str,
     payload: UpdateGameStateRequest,
     user: User = Depends(get_current_user),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> Response:
     try:
         store.update_game_state(game_id, user, payload.state)
@@ -98,7 +98,7 @@ def end_game(
     game_id: str,
     payload: CompleteGameRequest,
     user: User = Depends(get_current_user),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> Response:
     try:
         store.complete_game(game_id, user, payload.finalState)
@@ -114,7 +114,7 @@ def end_game(
 async def watch_game(
     game_id: str,
     request: Request,
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> StreamingResponse:
     if store.get_game_state(game_id) is None and not store.is_ended_game(game_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")

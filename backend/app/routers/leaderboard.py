@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from ..auth import get_store
 from ..models import LeaderboardEntry, Mode
-from ..store import InMemoryStore
+from ..store_base import Store
 
 
 router = APIRouter(prefix="/leaderboard", tags=["Leaderboard"])
@@ -26,7 +26,7 @@ def sse_event(event: str, data: Any) -> bytes:
 def get_leaderboard(
     mode: Mode = Query(...),
     limit: int = Query(10, ge=1),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> list[LeaderboardEntry]:
     return store.list_leaderboard(mode, limit)
 
@@ -35,7 +35,7 @@ def get_leaderboard(
 async def stream_leaderboard(
     request: Request,
     mode: Mode = Query(...),
-    store: InMemoryStore = Depends(get_store),
+    store: Store = Depends(get_store),
 ) -> StreamingResponse:
     async def event_stream():
         last_version = -1

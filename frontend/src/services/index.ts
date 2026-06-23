@@ -1,10 +1,10 @@
-import { MockGameService } from "./mock";
+import { ApiGameService } from "./client";
 import type { GameService } from "./types";
 
 let _service: GameService | null = null;
 
 export function getService(): GameService {
-  if (!_service) _service = new MockGameService();
+  if (!_service) _service = new ApiGameService();
   return _service;
 }
 
