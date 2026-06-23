@@ -6,8 +6,8 @@ info:
   description: |
     Backend contract inferred from the frontend service interface in `frontend/src/services`.
 
-    Authentication is cookie-based. Endpoints marked with the `sessionCookie`
-    security requirement require an authenticated user session.
+    Authentication uses bearer tokens. Endpoints marked with the `bearerAuth`
+    security requirement require a valid `Authorization: Bearer <token>` header.
 
     The frontend expects both request/response APIs and live subscription-style
     updates for active games, watched games, and leaderboard changes. Those
@@ -27,7 +27,7 @@ paths:
       tags: [Auth]
       operationId: getSession
       summary: Get the current authenticated user
-      description: Returns the signed-in user or `null` when no session exists.
+      description: Returns the signed-in user or `null` when no valid bearer token is provided.
       responses:
         '200':
           description: Current session state
@@ -49,7 +49,7 @@ paths:
               $ref: '#/components/schemas/AuthCredentials'
       responses:
         '201':
-          description: Account created and session established
+          description: Account created and access token issued
           content:
             application/json:
               schema:
@@ -74,7 +74,7 @@ paths:
               $ref: '#/components/schemas/AuthCredentials'
       responses:
         '200':
-          description: Session established
+          description: Access token issued
           content:
             application/json:
               schema:
@@ -92,7 +92,7 @@ paths:
       operationId: logout
       summary: Sign out
       security:
-        - sessionCookie: []
+        - bearerAuth: []
       responses:
         '204':
           description: Session cleared
@@ -109,7 +109,7 @@ paths:
       operationId: startGame
       summary: Start a new game
       security:
-        - sessionCookie: []
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -186,6 +186,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authenticated user does not own this game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '410':
           description: Game has already ended
           content:
@@ -199,7 +205,7 @@ paths:
       operationId: pushGameState
       summary: Push the latest in-progress game state
       security:
-        - sessionCookie: []
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/GameId'
       requestBody:
@@ -223,6 +229,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authenticated user does not own this game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /games/{gameId}/complete:
     post:
@@ -230,7 +242,7 @@ paths:
       operationId: endGame
       summary: Finish a game and record its final score
       security:
-        - sessionCookie: []
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/GameId'
       requestBody:
@@ -250,6 +262,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authenticated user does not own this game
           content:
             application/json:
               schema:
@@ -287,7 +305,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
   /leaderboard:
     get:
       tags: [Leaderboard]
@@ -345,11 +362,11 @@ paths:
 
 components:
   securitySchemes:
-    sessionCookie:
-      type: apiKey
-      in: cookie
-      name: session
-      description: Session cookie established by the login or signup endpoint.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Access token returned by the login or signup endpoint.
 
   parameters:
     GameId:
@@ -386,8 +403,16 @@ components:
       properties:
         user:
           $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - bearer
       required:
         - user
+        - accessToken
+        - tokenType
 
     AuthCredentials:
       type: object

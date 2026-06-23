@@ -40,6 +40,7 @@ class OpenAPISpecTests(unittest.TestCase):
 
     def test_auth_endpoints_use_session_and_credentials_schemas(self) -> None:
         paths = self.spec["paths"]
+        auth_response = self.spec["components"]["schemas"]["AuthResponse"]
 
         self.assertEqual(
             paths["/auth/session"]["get"]["responses"]["200"]["content"]["application/json"][
@@ -71,8 +72,10 @@ class OpenAPISpecTests(unittest.TestCase):
             ]["$ref"],
             "#/components/schemas/AuthResponse",
         )
+        self.assertEqual(auth_response["properties"]["accessToken"]["type"], "string")
+        self.assertEqual(auth_response["properties"]["tokenType"]["enum"], ["bearer"])
 
-    def test_authenticated_endpoints_require_session_cookie(self) -> None:
+    def test_authenticated_endpoints_require_bearer_auth(self) -> None:
         protected_operations = [
             self.spec["paths"]["/auth/logout"]["post"],
             self.spec["paths"]["/games"]["post"],
@@ -81,7 +84,7 @@ class OpenAPISpecTests(unittest.TestCase):
         ]
 
         for operation in protected_operations:
-            self.assertEqual(operation["security"], [{"sessionCookie": []}])
+            self.assertEqual(operation["security"], [{"bearerAuth": []}])
 
     def test_game_endpoints_use_expected_request_and_response_shapes(self) -> None:
         paths = self.spec["paths"]
@@ -115,6 +118,18 @@ class OpenAPISpecTests(unittest.TestCase):
                 "application/json"
             ]["schema"]["$ref"],
             "#/components/schemas/CompleteGameRequest",
+        )
+        self.assertEqual(
+            paths["/games/{gameId}/state"]["put"]["responses"]["403"]["content"][
+                "application/json"
+            ]["schema"]["$ref"],
+            "#/components/schemas/ErrorResponse",
+        )
+        self.assertEqual(
+            paths["/games/{gameId}/complete"]["post"]["responses"]["403"]["content"][
+                "application/json"
+            ]["schema"]["$ref"],
+            "#/components/schemas/ErrorResponse",
         )
 
     def test_public_discovery_endpoints_match_frontend_read_models(self) -> None:
