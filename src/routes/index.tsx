@@ -1,29 +1,44 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
-    ],
-  }),
-  component: Index,
+  component: Home,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Home() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <main className="mx-auto max-w-5xl px-4 py-16">
+      <section className="text-center">
+        <h1 className="font-mono text-5xl font-bold tracking-tight text-primary md:text-7xl">
+          Snake Arena
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
+          Classic snake — two flavors. Smash walls or wrap through them.
+          Climb the leaderboard. Watch others stake their claim.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link to="/play" className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90">
+            Play now
+          </Link>
+          <Link to="/watch" className="rounded-md border border-border bg-card px-6 py-3 font-medium hover:bg-muted">
+            Watch others
+          </Link>
+        </div>
+      </section>
+
+      <section className="mt-16 grid gap-4 md:grid-cols-2">
+        <Card title="Walls mode" desc="One wrong move and it's over. Pure precision." emoji="🧱" />
+        <Card title="Wrap mode" desc="Edges loop. The board has no end — just your tail." emoji="🌀" />
+      </section>
+    </main>
+  );
+}
+
+function Card({ title, desc, emoji }: { title: string; desc: string; emoji: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-6">
+      <div className="text-3xl">{emoji}</div>
+      <h3 className="mt-3 font-mono text-xl font-semibold">{title}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
     </div>
   );
 }
