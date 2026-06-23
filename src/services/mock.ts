@@ -81,8 +81,8 @@ export class MockGameService implements GameService {
   private gameEmitters = new Map<string, Emitter<GameState | null>>();
   private botTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(opts: { bots?: boolean } = {}) {
-    this.db = loadDB();
+  constructor(opts: { bots?: boolean; seed?: boolean } = {}) {
+    this.db = loadDB(opts.seed ?? true);
     if (opts.bots ?? (typeof window !== "undefined")) {
       this.spawnBot("CobraBot", "walls");
       this.spawnBot("ViperBot", "wrap");
