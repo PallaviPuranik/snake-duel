@@ -4,7 +4,7 @@ import { createGame, step } from "@/game/snake";
 
 function freshService() {
   localStorage.clear();
-  return new MockGameService({ bots: false });
+  return new MockGameService({ bots: false, seed: false });
 }
 
 describe("MockGameService", () => {
